@@ -2,7 +2,7 @@
 const _ = require('underscore');
 const path = require('path');
 const gutil = require('gulp-util');
-const PluginError  = gutil.PluginError;
+const PluginError = gutil.PluginError;
 const through = require('through2');
 const vinylFile = require('vinyl-file');
 const revHash = require('rev-hash');
@@ -12,96 +12,114 @@ const modifyFilename = require('modify-filename');
 
 let conf = {};
 
+
+function relPath(base, filePath) {
+    filePath = filePath.replace(/\\/g, '/');
+    base = base.replace(/\\/g, '/');
+
+    if (!filePath.startsWith(base)) {
+        return filePath;
+    }
+
+    const newPath = filePath.slice(base.length);
+
+    if (newPath[0] === '/') {
+        return newPath.slice(1);
+    }
+
+    return newPath;
+}
+
+
 function transformFilename(file) {
     file.path = modifyFilename(file.path, (filename, extension) => {
         const extIndex = filename.indexOf('.');
 
-    filename = extIndex === -1 ?
-        revPath(filename, file.revHash) :
-        revPath(filename.slice(0, extIndex), file.revHash) + filename.slice(extIndex);
+        filename = extIndex === -1 ?
+                revPath(filename, file.revHash) :
+                revPath(filename.slice(0, extIndex), file.revHash) + filename.slice(extIndex);
 
-    return filename + extension;
-});
+        return filename + extension;
+    });
 }
 
 const getManifestFile = opts => vinylFile.read(opts.path, opts).catch(err => {
-    if (err.code === 'ENOENT') {
-    return new gutil.File(opts);
-}
+        if (err.code === 'ENOENT') {
+            return new gutil.File(opts);
+        }
 
-throw err;
-});
+        throw err;
+    });
 
-const plugin = (opts={}) => {
+const plugin = (opts = {}) => {
     conf = opts;
     const sourcemaps = [];
     const pathMap = {};
 
     return through.obj((file, enc, cb) => {
         if (file.isNull()) {
+            cb(null, file);
+            return;
+        }
+
+        if (file.isStream()) {
+            cb(new gutil.PluginError('gulp-rev', 'Streaming not supported'));
+            return;
+        }
+
+        // This is a sourcemap, hold until the end
+        if (path.extname(file.path) === '.map') {
+            sourcemaps.push(file);
+            cb();
+            return;
+        }
+
+        const oldPath = file.path;
+
+        // Save the old path for later
+        file.revOrigPath = file.path;
+        file.revOrigBase = file.base;
+        file.revHash = revHash(file.contents);
+
+        if (!opts.query) {
+            transformFilename(file);
+        }
+        pathMap[oldPath] = file.revHash;
+
         cb(null, file);
-        return;
-    }
-
-    if (file.isStream()) {
-        cb(new gutil.PluginError('gulp-rev', 'Streaming not supported'));
-        return;
-    }
-
-    // This is a sourcemap, hold until the end
-    if (path.extname(file.path) === '.map') {
-        sourcemaps.push(file);
-        cb();
-        return;
-    }
-
-    const oldPath = file.path;
-
-    // Save the old path for later
-    file.revOrigPath = file.path;
-    file.revOrigBase = file.base;
-    file.revHash = revHash(file.contents);
-
-    if(!opts.query){
-        transformFilename(file);
-    }
-    pathMap[oldPath] = file.revHash;
-
-    cb(null, file);
-}, function (cb) {
+    }, function (cb) {
         sourcemaps.forEach(file => {
             let reverseFilename;
 
-        // Attempt to parse the sourcemap's JSON to get the reverse filename
-        try {
-            reverseFilename = JSON.parse(file.contents.toString()).file;
-        } catch (err) {}
+            // Attempt to parse the sourcemap's JSON to get the reverse filename
+            try {
+                reverseFilename = JSON.parse(file.contents.toString()).file;
+            } catch (err) {
+            }
 
-        if (!reverseFilename) {
-            reverseFilename = path.relative(path.dirname(file.path), path.basename(file.path, '.map'));
-        }
+            if (!reverseFilename) {
+                reverseFilename = path.relative(path.dirname(file.path), path.basename(file.path, '.map'));
+            }
 
-        if (pathMap[reverseFilename]) {
-            // Save the old path for later
-            file.revOrigPath = file.path;
-            file.revOrigBase = file.base;
+            if (pathMap[reverseFilename]) {
+                // Save the old path for later
+                file.revOrigPath = file.path;
+                file.revOrigBase = file.base;
 
-            const hash = pathMap[reverseFilename];
-            file.path = revPath(file.path.replace(/\.map$/, ''), hash) + '.map';
-        } else {
-            transformFilename(file);
-        }
+                const hash = pathMap[reverseFilename];
+                file.path = revPath(file.path.replace(/\.map$/, ''), hash) + '.map';
+            } else {
+                transformFilename(file);
+            }
 
-        this.push(file);
-    });
+            this.push(file);
+        });
 
         cb();
     });
 };
 
 plugin.manifest = (opts) => {
-    console.log(path.resolve('rev-manifest.json'));
-
     opts = Object.assign({
         path: path.resolve('rev-manifest.json'),
         merge: true,
@@ -113,14 +131,18 @@ plugin.manifest = (opts) => {
     return through.obj((file, enc, cb) => {
         // Ignore all non-rev'd files
         if (!file.path || !file.revOrigPath) {
+            cb();
+            return;
+        }
+        
+        /* rev3 */
+        const basePath = path.dirname(relPath(path.resolve(file.cwd, file.base), path.resolve(file.cwd, file.path)));
+        const originalFile = path.join(basePath, path.basename(file.revOrigPath)).replace(/\\/g, '/');
+        const revisionedFile = path.join(basePath, conf.query ? `${path.basename(file.revOrigPath)}?_v_=${file.revHash}` : path.basename(file.path)).replace(/\\/g, '/');
+        manifest[originalFile] = revisionedFile;
+        
         cb();
-        return;
-    }
-    // 向 rev-manifest 写入映射表
-    manifest[path.resolve(file.revOrigPath)] = conf.query ? `${path.basename(file.revOrigPath)}?_v_=${file.revHash}` : path.basename(file.path);
-
-    cb();
-}, function (cb) {
+    }, function (cb) {
         // No need to write a manifest file if there's nothing to manifest
         if (Object.keys(manifest).length === 0) {
             cb();
@@ -129,19 +151,20 @@ plugin.manifest = (opts) => {
 
         getManifestFile(opts).then(manifestFile => {
             if (opts.merge && !manifestFile.isNull()) {
-            let oldManifest = {};
+                let oldManifest = {};
 
-            try {
-                oldManifest = opts.transformer.parse(manifestFile.contents.toString());
-            } catch (err) {}
+                try {
+                    oldManifest = opts.transformer.parse(manifestFile.contents.toString());
+                } catch (err) {
+                }
 
-            manifest = Object.assign(oldManifest, manifest);
-        }
+                manifest = Object.assign(oldManifest, manifest);
+            }
 
-        manifestFile.contents = Buffer.from(opts.transformer.stringify(sortKeys(manifest), null, '  '));
-        this.push(manifestFile);
-        cb();
-    }).catch(cb);
+            manifestFile.contents = Buffer.from(opts.transformer.stringify(sortKeys(manifest), null, '  '));
+            this.push(manifestFile);
+            cb();
+        }).catch(cb);
     });
 };
 
@@ -159,13 +182,13 @@ function escPathPattern(pattern) {
 }
 
 function closeDirBySep(dirname) {
-    return dirname + (!dirname || new RegExp( escPathPattern('/') + '$' ).test(dirname) ? '' : '/');
+    return dirname + (!dirname || new RegExp(escPathPattern('/') + '$').test(dirname) ? '' : '/');
 }
 
 plugin.update = (opts) => {
     opts = _.defaults((opts || {}), defaults);
 
-    var manifest  = require(opts.manifestFile || path.resolve('rev-manifest'));
+    var manifest = require(opts.manifestFile || path.resolve('rev-manifest'));
     var mutables = [];
     return through.obj(function (file, enc, cb) {
         if (!file.isNull()) {
@@ -175,10 +198,10 @@ plugin.update = (opts) => {
     }, function (cb) {
         var changes = [];
         var dirReplacements = [];
-        if ( _.isObject(opts.dirReplacements) ) {
+        if (_.isObject(opts.dirReplacements)) {
             Object.keys(opts.dirReplacements).forEach(function (srcDirname) {
                 dirReplacements.push({
-                    dirRX:  escPathPattern( closeDirBySep(srcDirname) ),
+                    dirRX: escPathPattern(closeDirBySep(srcDirname)),
                     dirRpl: opts.dirReplacements[srcDirname]
                 });
             });
@@ -186,15 +209,17 @@ plugin.update = (opts) => {
 
         if (opts.collectedManifest) {
             this.push(
-                new gutil.File({
-                    path: opts.collectedManifest,
-                    contents: new Buffer(JSON.stringify(manifest, null, "\t"))
-                })
-            );
+                    new gutil.File({
+                        path: opts.collectedManifest,
+                        contents: new Buffer(JSON.stringify(manifest, null, "\t"))
+                    })
+                    );
         }
 
         for (var key in manifest) {
-            var patterns = [ escPathPattern(key) ];
+
+            var patterns = [escPathPattern(key)];
+
             if (opts.replaceReved) {
                 var patternExt = path.extname(key);
                 if (patternExt in opts.extMap) {
@@ -202,26 +227,26 @@ plugin.update = (opts) => {
                 } else {
                     patternExt = escPathPattern(patternExt);
                 }
-                patterns.push( escPathPattern( (path.dirname(key) === '.' ? '' : closeDirBySep(path.dirname(key)) ) )
-                    + path.basename(key, path.extname(key))
+                patterns.push(escPathPattern((path.dirname(key) === '.' ? '' : closeDirBySep(path.dirname(key))))
+                        + path.basename(key, path.extname(key))
                         .split('.')
-                        .map(function(part){
+                        .map(function (part) {
                             return escPathPattern(part) + '(' + opts.revSuffix + ')?';
                         })
                         .join('\\.')
-                    + patternExt
-                );
+                        + patternExt
+                        );
             }
 
-            if ( dirReplacements.length ) {
+            if (dirReplacements.length) {
                 dirReplacements.forEach(function (dirRule) {
                     patterns.forEach(function (pattern) {
                         changes.push({
-                            regexp: new RegExp(  dirRule.dirRX + pattern, 'g' ),
+                            regexp: new RegExp(dirRule.dirRX + pattern, 'g'),
                             patternLength: (dirRule.dirRX + pattern).length,
                             replacement: _.isFunction(dirRule.dirRpl)
-                                ? dirRule.dirRpl(manifest[key])
-                                : closeDirBySep(dirRule.dirRpl) + manifest[key]
+                                    ? dirRule.dirRpl(manifest[key])
+                                    : closeDirBySep(dirRule.dirRpl) + manifest[key]
                         });
                     });
                 });
@@ -242,7 +267,7 @@ plugin.update = (opts) => {
                     }
                     prefixDelim += '])';
                     changes.push({
-                        regexp: new RegExp( prefixDelim + pattern, 'g' ),
+                        regexp: new RegExp(prefixDelim + pattern, 'g'),
                         patternLength: pattern.length,
                         replacement: '$1' + manifest[key]
                     });
@@ -253,25 +278,17 @@ plugin.update = (opts) => {
         // Replace longer patterns first
         // e.g. match `script.js.map` before `script.js`
         changes.sort(
-            function(a, b) {
-                return b.patternLength - a.patternLength;
-            }
+                function (a, b) {
+                    return b.patternLength - a.patternLength;
+                }
         );
-        mutables.forEach(function (file){
+
+        mutables.forEach(function (file) {
             if (!file.isNull()) {
                 var src = file.contents.toString('utf8');
-                let dir = path.dirname(path.resolve(file.path));
-
-                let assetReg = /\((.+(?:png|jpg|gif)"?'?)\)/g,
-                    res;
-                while(res = assetReg.exec(src)){
-                    let absPath = path.join(dir, res[1]);
-                    let fileName = path.basename(absPath).replace(/([\|\^\*\.\+\$\?\[\]\(\)\{\}])/g, '\\$1');
-                    if(manifest[absPath]){
-                        // 全局字符串替换
-                        src = src.replace(new RegExp(fileName, 'g'), manifest[absPath]);
-                    }
-                }
+                changes.forEach(function (r) {
+                    src = src.replace(r.regexp, r.replacement);
+                });
                 file.contents = new Buffer(src);
             }
             this.push(file);
