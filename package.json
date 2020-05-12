@@ -1,11 +1,11 @@
 {
-  "name": "gulp-rev3",
+  "name": "gulp-rev-happy",
   "version": "1.0.0",
   "description": "improve gulp-rev2",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lbnnbs/gulp-rev3.git"
+    "url": "git+https://github.com/lbnnbs/gulp-rev-happy.git"
   },
   "author": "lbnnbs <412467691@qq.com>",
   "engines": {
@@ -35,18 +35,20 @@
   "dependencies": {
     "gulp-util": "^3.0.0",
     "modify-filename": "^1.1.0",
-    "rev-hash": "^2.0.0",
-    "rev-path": "^1.0.0",
+    "plugin-error": "^1.0.1",
+    "rev-happy": "^2.0.0",
+    "rev-path": "^2.0.0",
     "sort-keys": "^2.0.0",
     "through2": "^2.0.0",
     "underscore": "^1.8.3",
+    "vinyl": "^2.1.0",
     "vinyl-file": "^3.0.0"
   },
   "devDependencies": {},
   "bugs": {
-    "url": "https://github.com/lbnnbs/gulp-rev3/issues"
+    "url": "https://github.com/lbnnbs/gulp-rev-happy/issues"
   },
-  "homepage": "https://github.com/lbnnbs/gulp-rev3#readme",
+  "homepage": "https://github.com/lbnnbs/gulp-rev-happy#readme",
   "main": "index.js",
   "directories": {
     "test": "test"
