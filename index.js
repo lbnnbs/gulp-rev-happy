@@ -135,7 +135,7 @@ plugin.manifest = (opts) => {
             return;
         }
         
-        /* rev3 */
+        /* rev-happy */
         const basePath = path.dirname(relPath(path.resolve(file.cwd, file.base), path.resolve(file.cwd, file.path)));
         const originalFile = path.join(basePath, path.basename(file.revOrigPath)).replace(/\\/g, '/');
         const revisionedFile = path.join(basePath, conf.query ? `${path.basename(file.revOrigPath)}?_v_=${file.revHash}` : path.basename(file.path)).replace(/\\/g, '/');
@@ -188,7 +188,12 @@ function closeDirBySep(dirname) {
 plugin.update = (opts) => {
     opts = _.defaults((opts || {}), defaults);
 
-    var manifest = require(opts.manifestFile || path.resolve('rev-manifest'));
+    /* rev-happy ÇåÀí»º´æ */
+    var rev_manifest = opts.manifestFile || path.resolve('rev-manifest');
+    delete require.cache[require.resolve(rev_manifest)];
+    
+    var manifest = require(rev_manifest);
+    
     var mutables = [];
     return through.obj(function (file, enc, cb) {
         if (!file.isNull()) {
@@ -215,7 +220,7 @@ plugin.update = (opts) => {
                     })
                     );
         }
-
+        
         for (var key in manifest) {
 
             var patterns = [escPathPattern(key)];
@@ -282,7 +287,7 @@ plugin.update = (opts) => {
                     return b.patternLength - a.patternLength;
                 }
         );
-
+        
         mutables.forEach(function (file) {
             if (!file.isNull()) {
                 var src = file.contents.toString('utf8');
