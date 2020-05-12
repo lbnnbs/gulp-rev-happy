@@ -65,7 +65,7 @@ gulp.task('default', gulp.series('image', 'css', 'js', 'html', function () {
 }));
 
 ## 设计思路
-**gulp-rev3** 主要借鉴了 **gulp-rev** 和 **gulp-rev-collector** 的设计实现，主要实现思路如下：
+**gulp-rev3** 修改自 **gulp-rev** , **gulp-rev-collector** 和 **gulp-rev2** ，主要实现如下：
 
 1. 根据文件的内容 `file.contents` 生成文件指纹（`hash`值）；
 
