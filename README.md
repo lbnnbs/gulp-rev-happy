@@ -1,4 +1,4 @@
-# gulp-rev2
+# gulp-rev3
 
 > 给资源文件添加文件指纹
 >
@@ -8,34 +8,64 @@
 
 ## Install
 ```bash
-$ npm install --save-dev gulp-rev2
+$ npm install --save-dev gulp-rev3
 ```
 ## Usage
 
 ```js
 const gulp = require('gulp');
-const rev2 = require('gulp-rev2');
+const rev3 = require('gulp-rev3');
 
-gulp.task('build:image', ()=>{
-    return gulp.src('./demo/**/*.{png,jpg,gif,ico}')
-        .pipe(rev2({                // 生成文件指纹并修改文件名
-            // 以 query string的方式进行指纹关联, 默认使用修改文件名方式进行关联   
-            query: true,            
-        }))
-        .pipe(gulp.dest('dist'))    // 输出到 dist 目录
-        .pipe(rev2.manifest())      // 生成映射对照表 rev-manifest.js
-        .pipe(gulp.dest('.'));      // 输出到 gulpfile.js 同级目录
+// 为image计算文件指纹并保存对应关系到manifest，然后输出到dist文件夹
+gulp.task('image', function () {
+    return gulp.src('src/**/*.{png,jpg,gif,ico}')
+            .pipe(rev3({
+                query: true,
+            }))
+            .pipe(gulp.dest('dist'))
+            .pipe(rev3.manifest())
+            .pipe(gulp.dest('.'));
 });
 
-gulp.task('build:css', ['build:image'], ()=>{
-    return gulp.src('./demo/**/*.css')
-        .pipe(rev2.update())        // 根据映射对照表更新存在引用的父文件
-        .pipe(gulp.dest('dist'))
+// 为js计算文件指纹并保存对应关系到manifest
+gulp.task('js', function () {
+    return gulp.src('src/js/**/*.js')
+            .pipe(rev3({
+                query: true,
+            }))
+            .pipe(rev3.manifest())
+            .pipe(gulp.dest('.'));
 });
-```
+
+// 为css计算文件指纹并保存对应关系到manifest
+gulp.task('css', function () {
+    return gulp.src('src/css/**/*.css')
+            .pipe(rev3({
+                query: true,
+            }))
+            .pipe(rev3.manifest())
+            .pipe(gulp.dest('.'));
+});
+
+// 为html计算文件指纹并保存对应关系到manifest
+gulp.task('html', function () {
+    return gulp.src('src/**/*.html')
+            .pipe(rev3({
+                query: true,
+            }))
+            .pipe(rev3.manifest())
+            .pipe(gulp.dest('.'));
+});
+
+// 使用文件指纹对应关系文件manifest，更新css，js，html里面的文件链接
+gulp.task('default', gulp.series('image', 'css', 'js', 'html', function () {
+    return gulp.src('src/**/*.{css,js,html}')
+            .pipe(rev3.update())
+            .pipe(gulp.dest('dist'));
+}));
 
 ## 设计思路
-**gulp-rev2** 主要借鉴了 **gulp-rev** 和 **gulp-rev-collector** 的设计实现，主要实现思路如下：
+**gulp-rev3** 主要借鉴了 **gulp-rev** 和 **gulp-rev-collector** 的设计实现，主要实现思路如下：
 
 1. 根据文件的内容 `file.contents` 生成文件指纹（`hash`值）；
 
@@ -45,7 +75,7 @@ gulp.task('build:css', ['build:image'], ()=>{
 
 ## 配置项
 
-### rev2([opts])
+### rev3([opts])
 
 #### query
 
@@ -54,8 +84,3 @@ Default: `false`
 
 设置文件指纹的关联方式，`true` 通过url参数关联 `a.png` → `a.png?_v_=f7ee61d96b`，`false` 通过文件名关联 `a.png` → `a-f7ee61d96b.png`。
 
-## Demo
-
-这里有一个栗子：[**gulp-rev2-demo**](https://github.com/makemoretime/gulp-rev2-demo)
-
-这里有一篇教程：[**给资源文件添加指纹（Gulp版）**](https://www.cnblogs.com/iovec/p/7772567.html)
