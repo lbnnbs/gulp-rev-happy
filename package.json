@@ -1,13 +1,13 @@
 {
-  "name": "gulp-rev2",
-  "version": "1.0.6",
-  "description": "improve gulp-rev",
+  "name": "gulp-rev3",
+  "version": "1.0.0",
+  "description": "improve gulp-rev2",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/makemoretime/gulp-rev2.git"
+    "url": "git+https://github.com/lbnnbs/gulp-rev3.git"
   },
-  "author": "yunzhao.li <516911028@qq.com>",
+  "author": "lbnnbs <412467691@qq.com>",
   "engines": {
     "node": ">=4"
   },
@@ -44,9 +44,9 @@
   },
   "devDependencies": {},
   "bugs": {
-    "url": "https://github.com/makemoretime/gulp-rev2/issues"
+    "url": "https://github.com/lbnnbs/gulp-rev3/issues"
   },
-  "homepage": "https://github.com/makemoretime/gulp-rev2#readme",
+  "homepage": "https://github.com/lbnnbs/gulp-rev3#readme",
   "main": "index.js",
   "directories": {
     "test": "test"
