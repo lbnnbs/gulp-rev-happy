@@ -30,7 +30,7 @@ $ npm install --save-dev gulp-rev-happy
   
   
 ## 设计思路  
-**gulp-rev** 修改自 **gulp-rev** , **gulp-rev-collector** 和 **gulp-rev2** ，主要实现如下：  
+修改自 **gulp-rev** , **gulp-rev-collector** 和 **gulp-rev2** ，主要实现如下：  
   
 1. 根据文件的内容 `file.contents` 生成文件指纹（`hash`值）；  
   
