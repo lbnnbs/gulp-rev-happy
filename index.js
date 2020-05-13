@@ -134,13 +134,13 @@ plugin.manifest = (opts) => {
             cb();
             return;
         }
-        
-        /* rev-happy */
+
+        /* rev-happy: merge rev2's method and rev-collector's method */
         const basePath = path.dirname(relPath(path.resolve(file.cwd, file.base), path.resolve(file.cwd, file.path)));
         const originalFile = path.join(basePath, path.basename(file.revOrigPath)).replace(/\\/g, '/');
         const revisionedFile = path.join(basePath, conf.query ? `${path.basename(file.revOrigPath)}?_v_=${file.revHash}` : path.basename(file.path)).replace(/\\/g, '/');
         manifest[originalFile] = revisionedFile;
-        
+
         cb();
     }, function (cb) {
         // No need to write a manifest file if there's nothing to manifest
@@ -188,12 +188,12 @@ function closeDirBySep(dirname) {
 plugin.update = (opts) => {
     opts = _.defaults((opts || {}), defaults);
 
-    /* rev-happy ÇåÀí»º´æ */
+    /* rev-happy: clean manifest cache */
     var rev_manifest = opts.manifestFile || path.resolve('rev-manifest');
     delete require.cache[require.resolve(rev_manifest)];
-    
+
     var manifest = require(rev_manifest);
-    
+
     var mutables = [];
     return through.obj(function (file, enc, cb) {
         if (!file.isNull()) {
@@ -220,7 +220,7 @@ plugin.update = (opts) => {
                     })
                     );
         }
-        
+
         for (var key in manifest) {
 
             var patterns = [escPathPattern(key)];
@@ -272,7 +272,8 @@ plugin.update = (opts) => {
                     }
                     prefixDelim += '])';
                     changes.push({
-                        regexp: new RegExp(prefixDelim + pattern, 'g'),
+                        /* rev-happy: replace ?_v_=560396f564?_v_=560396f564 -> ?_v_=560396f564 */
+                        regexp: new RegExp(prefixDelim + pattern + '(\\?_v_=\\w{10})?', 'g'),
                         patternLength: pattern.length,
                         replacement: '$1' + manifest[key]
                     });
@@ -287,12 +288,15 @@ plugin.update = (opts) => {
                     return b.patternLength - a.patternLength;
                 }
         );
-        
+
         mutables.forEach(function (file) {
             if (!file.isNull()) {
                 var src = file.contents.toString('utf8');
                 changes.forEach(function (r) {
                     src = src.replace(r.regexp, r.replacement);
+
+                    /* rev-happy: replace ?_v_=560396f564? -> ?_v_=560396f564&  */
+                    src = src.replace(/(\?_v_\=\w{10})\?/g, '$1\&');
                 });
                 file.contents = new Buffer(src);
             }
